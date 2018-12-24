@@ -4,10 +4,11 @@
 
 # Description 
 Optimizes generated DbContext output of "dotnet ef dbcontext scaffold".
-- Makes DB schema changeable at runtime" + Environment.NewLine +
+- Makes DB schema changeable at runtime"
 - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context.
 
-#Usage
+
+# Usage
 
 `dotnet DotnetEfDbcontextConverter.exe path\myDbContext.cs`
 
@@ -19,6 +20,7 @@ dotnet ef dbcontext scaffold "server=mysqltest;port=3306;user=myuser;password=my
 ```
 
 Using .NET Core, you can run the DLL directly via "dotnet" command.
+
 If you want an EXE file, run
 
 `dotnet publish -c Release -r win10-x64`
@@ -26,9 +28,10 @@ If you want an EXE file, run
 within the project's directory.
 
 
-#Download
+
+# Download
 - coreapp-dll.zip contains the compiled DLL (recommended)
-- coreapp-exe.zip contains the release Exe (quite large)
+- coreapp-exe.zip contains the release Exe (quite large, usually better to use the core DLL)
 
 
 # Links
