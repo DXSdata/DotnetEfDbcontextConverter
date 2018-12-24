@@ -35,4 +35,4 @@ within the project's directory.
 
 
 # Links
-- Website http://www.dxsdata.com/2018/02/net-clipboard-tools/
+- Website https://www.dxsdata.com/de/2018/12/net-core-entity-framework-dbcontext-converter/
