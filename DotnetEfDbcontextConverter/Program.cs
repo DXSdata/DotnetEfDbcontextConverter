@@ -14,9 +14,11 @@ namespace DotnetEfDbcontextConverter
                 Console.WriteLine(
                     "Optimizes generated DbContext output of \"dotnet ef dbcontext scaffold\"." + Environment.NewLine +
                     " - Makes DB schema changeable at runtime" + Environment.NewLine +
-                    " - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context." + Environment.NewLine + Environment.NewLine +
+                    " - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context." + Environment.NewLine + 
+                    " - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc)." + Environment.NewLine +
+                    Environment.NewLine +
                     "Usage: " + Environment.NewLine +
-                    "DotnetEfDbcontextConverter.exe path\\myDbContext.cs");
+                    "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms]");
 
                 Console.ReadKey();
 
@@ -58,6 +60,19 @@ namespace DotnetEfDbcontextConverter
             //Remove OnConfiguring method
             var onConfigStartpos = lines.FindIndex(o => o.Contains("protected override void OnConfiguring"));
             lines.RemoveRange(onConfigStartpos, 8);
+
+            //For better WinForms / grid usage: Replace ICollection and HashSet with BindingList
+            //(E.g. using parent/child relations in grid, ICollection might have only 2 grid columns like "Count" or "ReadOnly"
+            if (args.Any(a => a == "--winforms"))
+            {
+                var dir = new FileInfo(file).DirectoryName;
+                foreach (var f in Directory.GetFiles(dir, "*.cs"))
+                {
+                    var fcontent = File.ReadAllText(f);
+                    fcontent = "using System.ComponentModel;" + Environment.NewLine + fcontent.Replace("ICollection<", "IList<").Replace("HashSet<", "BindingList<");
+                    File.WriteAllText(f, fcontent, System.Text.Encoding.Default);
+                }
+            }
 
             File.WriteAllLines(file, lines, System.Text.Encoding.Default);
 
