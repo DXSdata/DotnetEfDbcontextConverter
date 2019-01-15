@@ -63,6 +63,7 @@ namespace DotnetEfDbcontextConverter
 
             //For better WinForms / grid usage: Replace ICollection and HashSet with BindingList
             //(E.g. using parent/child relations in grid, ICollection might have only 2 grid columns like "Count" or "ReadOnly"
+            //Alternative (untested): Use context.table.ToBindingList() as DataSource as described here: https://blogs.msdn.microsoft.com/efdesign/2010/09/08/data-binding-with-dbcontext/
             if (args.Any(a => a == "--winforms"))
             {
                 var dir = new FileInfo(file).DirectoryName;

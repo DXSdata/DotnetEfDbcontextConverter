@@ -4,7 +4,7 @@
 
 # Description 
 Optimizes generated DbContext output of "dotnet ef dbcontext scaffold".
-- Makes DB schema changeable at runtime"
+- Makes DB schema changeable at runtime
 - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context.
 - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc).
 
