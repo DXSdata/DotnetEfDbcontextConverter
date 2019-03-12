@@ -36,9 +36,18 @@ namespace DotnetEfDbcontextConverter
             //Get original schema name
             var schemaPosition = content.IndexOf("entity.ToTable(");
             var origSchema = content.Substring(schemaPosition, 50);
-            origSchema = origSchema.Split(",")[1].Trim().Trim('"');
-            var schemaEndPosition = origSchema.IndexOf('"');
-            origSchema = origSchema.Substring(0, schemaEndPosition);
+            try
+            {
+                origSchema = origSchema.Split(",")[1].Trim().Trim('"');
+                var schemaEndPosition = origSchema.IndexOf('"');
+                origSchema = origSchema.Substring(0, schemaEndPosition);
+            }
+            catch(IndexOutOfRangeException) //As an alternative method, use database name from connection string
+            {
+                schemaPosition = content.IndexOf("database=");
+                origSchema = content.Substring(schemaPosition);
+                origSchema = origSchema.Split(";", 2)[0].Trim().Replace("database=","").Replace("\"", "").Replace(")", "");
+            }           
 
 
             //Insert static schema variable declaration
