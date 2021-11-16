@@ -8,7 +8,6 @@ namespace DotnetEfDbcontextConverter
     {
         static void Main(string[] args)
         {
-
             if (args.Length == 0)
             {
                 Console.WriteLine(
@@ -16,9 +15,10 @@ namespace DotnetEfDbcontextConverter
                     " - Makes DB schema changeable at runtime" + Environment.NewLine +
                     " - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context." + Environment.NewLine + 
                     " - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc)." + Environment.NewLine +
+                    " - Optional parameter --no-schema does not include the static variable Schema" + Environment.NewLine +
                     Environment.NewLine +
                     "Usage: " + Environment.NewLine +
-                    "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms]");
+                    "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms] [--no-schema]");
 
                 Console.ReadKey();
 
@@ -34,38 +34,40 @@ namespace DotnetEfDbcontextConverter
             Console.WriteLine("Backup file generated.");
 
             //Get original schema name
-            var schemaPosition = content.IndexOf("entity.ToTable(");
-            var origSchema = content.Substring(schemaPosition, 50);
-            try
-            {
-                origSchema = origSchema.Split(",")[1].Trim().Trim('"');
-                var schemaEndPosition = origSchema.IndexOf('"');
-                origSchema = origSchema.Substring(0, schemaEndPosition);
-            }
-            catch(IndexOutOfRangeException) //As an alternative method, use database name from connection string
-            {
-                schemaPosition = content.IndexOf("database=");
-                origSchema = content.Substring(schemaPosition);
-                origSchema = origSchema.Split(";", 2)[0].Trim().Replace("database=","").Replace("\"", "").Replace(")", "");
-            }           
-
-
-            //Insert static schema variable declaration
-            var staticVarDecl = Environment.NewLine + "\t\tpublic static string Schema = \"" + origSchema + "\";" + Environment.NewLine + Environment.NewLine;
-            if (!content.Contains(staticVarDecl))
-            {
-                var staticVarPosition = content.IndexOf(": DbContext") + 20;
-                content = content.Insert(staticVarPosition, staticVarDecl);
-            }
-
-            //Replace hard-coded schema name with variable
+            var addSchema = !args.Any(a => a == "--no-schema");
             var lines = content.Split(Environment.NewLine).ToList();
-            //foreach (var line in lines)
-            //lines.ForEach(line =>
-            lines = lines.Select(line => 
-                line.Contains("entity.ToTable") ? line.Replace("\""+origSchema+"\"", "Schema") : line
-            ).ToList();
-            
+
+            if (addSchema) {
+                var schemaPosition = content.IndexOf("entity.ToTable(");
+                var origSchema = content.Substring(schemaPosition, 50);
+                try {
+                    origSchema = origSchema.Split(",")[1].Trim().Trim('"');
+                    var schemaEndPosition = origSchema.IndexOf('"');
+                    origSchema = origSchema.Substring(0, schemaEndPosition);
+                } catch (IndexOutOfRangeException) //As an alternative method, use database name from connection string
+                  {
+                    schemaPosition = content.IndexOf("database=");
+                    if (schemaPosition != -1) {
+                        origSchema = content.Substring(schemaPosition);
+                        origSchema = origSchema.Split(";", 2)[0].Trim().Replace("database=", "").Replace("\"", "").Replace(")", "");
+                    } else // not found; connection string could possibly be anything except a RDBMS (e.g. SQLite-Datasource, ...)
+                        origSchema = "";
+                }
+
+                //Insert static schema variable declaration
+                var staticVarDecl = Environment.NewLine + "\t\tpublic static string Schema = \"" + origSchema + "\";" + Environment.NewLine + Environment.NewLine;
+                if (!content.Contains(staticVarDecl) && origSchema != "") {
+                    var staticVarPosition = content.IndexOf(": DbContext") + 20;
+                    content = content.Insert(staticVarPosition, staticVarDecl);
+                }
+
+                //Replace hard-coded schema name with variable
+                lines = lines.Select(line =>
+                    line.Contains("entity.ToTable") && addSchema
+                    ? line.Replace($"\"{ origSchema }\"", "Schema")
+                    : line
+                ).ToList();
+            }
             //Remove OnConfiguring method
             var onConfigStartpos = lines.FindIndex(o => o.Contains("protected override void OnConfiguring"));
             lines.RemoveRange(onConfigStartpos, 8);
