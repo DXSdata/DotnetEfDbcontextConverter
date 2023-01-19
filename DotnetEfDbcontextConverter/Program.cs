@@ -1,94 +1,108 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 
-namespace DotnetEfDbcontextConverter
+namespace DotnetEfDbcontextConverter;
+
+internal class Program
 {
-    class Program
+    private static void Main(string[] args)
     {
-        static void Main(string[] args)
+        if (args.Length == 0)
         {
-            if (args.Length == 0)
-            {
-                Console.WriteLine(
-                    "Optimizes generated DbContext output of \"dotnet ef dbcontext scaffold\"." + Environment.NewLine +
-                    " - Makes DB schema changeable at runtime" + Environment.NewLine +
-                    " - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context." + Environment.NewLine + 
-                    " - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc)." + Environment.NewLine +
-                    " - Optional parameter --no-schema does not include the static variable Schema" + Environment.NewLine +
-                    Environment.NewLine +
-                    "Usage: " + Environment.NewLine +
-                    "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms] [--no-schema]");
+            Console.WriteLine(
+                "Optimizes generated DbContext output of \"dotnet ef dbcontext scaffold\"." + Environment.NewLine +
+                " - Makes DB schema changeable at runtime" + Environment.NewLine +
+                " - Removes OnConfiguring method (including connectionString), so you can implement your own partial OnConfiguring method outside the generated context." +
+                Environment.NewLine +
+                " - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc)." +
+                Environment.NewLine +
+                " - Optional parameter --no-schema does not include the static variable Schema" + Environment.NewLine +
+                Environment.NewLine +
+                "Usage: " + Environment.NewLine +
+                "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms] [--no-schema]");
 
-                Console.ReadKey();
+            Console.ReadKey();
 
-                return;
-            }
-
-            
-            string file = args[0];
-
-            String content = File.ReadAllText(file);
-            File.Copy(file, file + ".backup", true);
-
-            Console.WriteLine("Backup file generated.");
-
-            //Get original schema name
-            var addSchema = !args.Any(a => a == "--no-schema");
-            var lines = content.Split(Environment.NewLine).ToList();
-
-            if (addSchema) {
-                var schemaPosition = content.IndexOf("entity.ToTable(");
-                var origSchema = content.Substring(schemaPosition, 50);
-                try {
-                    origSchema = origSchema.Split(",")[1].Trim().Trim('"');
-                    var schemaEndPosition = origSchema.IndexOf('"');
-                    origSchema = origSchema.Substring(0, schemaEndPosition);
-                } catch (IndexOutOfRangeException) //As an alternative method, use database name from connection string
-                  {
-                    schemaPosition = content.IndexOf("database=");
-                    if (schemaPosition != -1) {
-                        origSchema = content.Substring(schemaPosition);
-                        origSchema = origSchema.Split(";", 2)[0].Trim().Replace("database=", "").Replace("\"", "").Replace(")", "");
-                    } else // not found; connection string could possibly be anything except a RDBMS (e.g. SQLite-Datasource, ...)
-                        origSchema = "";
-                }
-
-                //Insert static schema variable declaration
-                var staticVarDecl = Environment.NewLine + "\t\tpublic static string Schema = \"" + origSchema + "\";" + Environment.NewLine + Environment.NewLine;
-                if (!content.Contains(staticVarDecl) && origSchema != "") {
-                    var staticVarPosition = content.IndexOf(": DbContext") + 20;
-                    content = content.Insert(staticVarPosition, staticVarDecl);
-                }
-
-                //Replace hard-coded schema name with variable
-                lines = lines.Select(line =>
-                    line.Contains("entity.ToTable") && addSchema
-                    ? line.Replace($"\"{ origSchema }\"", "Schema")
-                    : line
-                ).ToList();
-            }
-            //Remove OnConfiguring method
-            var onConfigStartpos = lines.FindIndex(o => o.Contains("protected override void OnConfiguring"));
-            lines.RemoveRange(onConfigStartpos, 8);
-
-            //For better WinForms / grid usage: Replace ICollection and HashSet with BindingList
-            //(E.g. using parent/child relations in grid, ICollection might have only 2 grid columns like "Count" or "ReadOnly"
-            //Alternative (untested): Use context.table.ToBindingList() as DataSource as described here: https://blogs.msdn.microsoft.com/efdesign/2010/09/08/data-binding-with-dbcontext/
-            if (args.Any(a => a == "--winforms"))
-            {
-                var dir = new FileInfo(file).DirectoryName;
-                foreach (var f in Directory.GetFiles(dir, "*.cs"))
-                {
-                    var fcontent = File.ReadAllText(f);
-                    fcontent = "using System.ComponentModel;" + Environment.NewLine + fcontent.Replace("ICollection<", "IList<").Replace("HashSet<", "BindingList<");
-                    File.WriteAllText(f, fcontent, System.Text.Encoding.Default);
-                }
-            }
-
-            File.WriteAllLines(file, lines, System.Text.Encoding.Default);
-
-            Console.WriteLine("Converting finished.");
+            return;
         }
+
+
+        var file = args[0];
+
+        var content = File.ReadAllText(file);
+        File.Copy(file, file + ".backup", true);
+
+        Console.WriteLine("Backup file generated.");
+
+        //Get original schema name
+        var addSchema = args.All(a => a != "--no-schema");
+        var lines = content.Split(Environment.NewLine).ToList();
+
+        if (addSchema)
+        {
+            var schemaPosition = content.IndexOf("entity.ToTable(", StringComparison.Ordinal);
+            var origSchema = content.Substring(schemaPosition, 50);
+            try
+            {
+                origSchema = origSchema.Split(",")[1].Trim().Trim('"');
+                var schemaEndPosition = origSchema.IndexOf('"');
+                origSchema = origSchema[..schemaEndPosition];
+            }
+            catch (IndexOutOfRangeException) //As an alternative method, use database name from connection string
+            {
+                schemaPosition = content.IndexOf("database=", StringComparison.Ordinal);
+                if (schemaPosition != -1)
+                {
+                    origSchema = content[schemaPosition..];
+                    origSchema = origSchema.Split(";", 2)[0].Trim().Replace("database=", "").Replace("\"", "")
+                        .Replace(")", "");
+                }
+                else // not found; connection string could possibly be anything except a RDBMS (e.g. SQLite-Datasource, ...)
+                {
+                    origSchema = "";
+                }
+            }
+
+            //Insert static schema variable declaration
+            var staticVarDecl = Environment.NewLine + "\t\tpublic static string Schema = \"" + origSchema + "\";" +
+                                Environment.NewLine + Environment.NewLine;
+            if (!content.Contains(staticVarDecl) && origSchema != "")
+            {
+                var staticVarPosition = content.IndexOf(": DbContext", StringComparison.Ordinal) + 20;
+                content = content.Insert(staticVarPosition, staticVarDecl);
+            }
+
+            //Replace hard-coded schema name with variable
+            lines = lines.Select(line =>
+                line.Contains("entity.ToTable") && addSchema
+                    ? line.Replace($"\"{origSchema}\"", "Schema")
+                    : line
+            ).ToList();
+        }
+
+        //Remove OnConfiguring method
+        var onConfigStartpos = lines.FindIndex(o => o.Contains("protected override void OnConfiguring"));
+        lines.RemoveRange(onConfigStartpos, 8);
+
+        //For better WinForms / grid usage: Replace ICollection and HashSet with BindingList
+        //(E.g. using parent/child relations in grid, ICollection might have only 2 grid columns like "Count" or "ReadOnly"
+        //Alternative (untested): Use context.table.ToBindingList() as DataSource as described here: https://blogs.msdn.microsoft.com/efdesign/2010/09/08/data-binding-with-dbcontext/
+        if (args.Any(a => a == "--winforms"))
+        {
+            var dir = new FileInfo(file).DirectoryName;
+            foreach (var f in Directory.GetFiles(dir, "*.cs"))
+            {
+                var fcontent = File.ReadAllText(f);
+                fcontent = "using System.ComponentModel;" + Environment.NewLine +
+                           fcontent.Replace("ICollection<", "IList<").Replace("HashSet<", "BindingList<");
+                File.WriteAllText(f, fcontent, Encoding.Default);
+            }
+        }
+
+        File.WriteAllLines(file, lines, Encoding.Default);
+
+        Console.WriteLine("Converting finished.");
     }
 }
