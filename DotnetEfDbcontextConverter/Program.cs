@@ -19,9 +19,11 @@ internal class Program
                 " - Optional parameter --winforms optimizes all generated .cs files in the context file's folder for usage in Windows Forms (grids etc)." +
                 Environment.NewLine +
                 " - Optional parameter --no-schema does not include the static variable Schema" + Environment.NewLine +
+                " - Optional parameter --internal-only makes all model files and the context internal. This is meant for projects with e.g. an sqlite datasource." +
+                Environment.NewLine +
                 Environment.NewLine +
                 "Usage: " + Environment.NewLine +
-                "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms] [--no-schema]");
+                "DotnetEfDbcontextConverter.exe path\\myDbContext.cs [--winforms] [--no-schema] [--internal-only]");
 
             Console.ReadKey();
 
@@ -86,6 +88,8 @@ internal class Program
         var onConfigStartpos = lines.FindIndex(o => o.Contains("protected override void OnConfiguring"));
         lines.RemoveRange(onConfigStartpos, 8);
 
+        File.WriteAllLines(file, lines, Encoding.Default);
+        
         //For better WinForms / grid usage: Replace ICollection and HashSet with BindingList
         //(E.g. using parent/child relations in grid, ICollection might have only 2 grid columns like "Count" or "ReadOnly"
         //Alternative (untested): Use context.table.ToBindingList() as DataSource as described here: https://blogs.msdn.microsoft.com/efdesign/2010/09/08/data-binding-with-dbcontext/
@@ -101,8 +105,21 @@ internal class Program
             }
         }
 
-        File.WriteAllLines(file, lines, Encoding.Default);
+        if (args.Any(a => a == "--internal-only"))
+        {
+            MakeClassesInternal(new FileInfo(file).DirectoryName);
+        }
 
         Console.WriteLine("Converting finished.");
+    }
+
+    static void MakeClassesInternal(string directory)
+    {
+        foreach (var file in Directory.GetFiles(directory, "*.cs"))
+        {
+            var content = File.ReadAllText(file);
+            content = content.Replace("public partial class", "internal partial class");
+            File.WriteAllText(file, content, Encoding.Default);
+        }
     }
 }
