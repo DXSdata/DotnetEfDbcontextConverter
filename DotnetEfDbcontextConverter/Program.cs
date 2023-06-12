@@ -62,7 +62,7 @@ namespace DotnetEfDbcontextConverter
                 }
 
                 //Replace hard-coded schema name with variable
-                lines = lines.Select(line =>
+                lines = content.Split(Environment.NewLine).Select(line =>
                     line.Contains("entity.ToTable") && addSchema
                     ? line.Replace($"\"{ origSchema }\"", "Schema")
                     : line
